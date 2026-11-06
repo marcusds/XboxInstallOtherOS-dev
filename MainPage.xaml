@@ -89,6 +89,8 @@
                         Click="BootIsoButton_Click"/>
                 <Button x:Name="ListFilesButton" Content="Show storage folder" Style="{StaticResource MenuButton}"
                         Click="ListFilesButton_Click"/>
+                <Button x:Name="HypervisorTestButton" Content="Test: hardware virtualization" Style="{StaticResource MenuButton}"
+                        Click="HypervisorTestButton_Click"/>
             </StackPanel>
 
 
