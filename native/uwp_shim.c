@@ -37,6 +37,13 @@ DW    __stdcall MsgWaitForMultipleObjectsEx(DW n, const PV *h, DW ms, DW mask, D
 }
 BOOL_ __stdcall PeekMessageW(PV m, PV h, unsigned a, unsigned b, unsigned r) { (void)m; (void)h; (void)a; (void)b; (void)r; return 0; }
 BOOL_ __stdcall PostMessageW(PV h, unsigned m, unsigned long long w, long long l) { (void)h; (void)m; (void)w; (void)l; return 0; }
+/* libslirp (user-mode networking) pings through iphlpapi; report failure so the guest's ping just gets no reply. */
+DW    __stdcall IcmpSendEcho2Ex(PV h, PV ev, PV apc, PV ctx, DW src, DW dst, PV data, unsigned short size, PV opts, PV reply, DW replySize, DW timeout)
+{
+    (void)h; (void)ev; (void)apc; (void)ctx; (void)src; (void)dst; (void)data; (void)size; (void)opts; (void)reply; (void)replySize; (void)timeout;
+    SetLastError(ERR_NOT_SUPPORTED);
+    return 0;
+}
 BOOL_ __stdcall EnumResourceLanguagesA(PV m, const char *t, const char *n, PV f, long long p) { (void)m; (void)t; (void)n; (void)f; (void)p; return 0; }
 
 /* libepoxy (used by the graphics code) opens libEGL.dll with LoadLibraryA. In an app only
