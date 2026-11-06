@@ -12,7 +12,7 @@ on:
         type: string
         default: ""
       angle_run:
-        description: "Optional: the run number at the end of a 'Build new ANGLE for Xbox' run's web address; its DLLs are added for the 'GPU (new ANGLE)' screen option."
+        description: "Optional: the run number at the end of a 'Build new ANGLE for Xbox' run's web address; its DLLs are added for the 'GPU (new ANGLE)' screen options. Empty = the newest successful one."
         type: string
         default: ""
       make_release:
@@ -407,17 +407,27 @@ jobs:
           Write-Host "Using $($gles.FullName)"
           Get-ChildItem libEGL.dll, libGLESv2.dll | Format-Table Name, Length
 
+      - name: Pick the "Build new ANGLE" run to use (the one given, or the newest successful one)
+        id: angle_pick
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $run = "${{ inputs.angle_run }}"
+          if (-not $run) { $run = gh run list --repo $env:GITHUB_REPOSITORY --workflow angle.yml --status success --limit 1 --json databaseId --jq '.[0].databaseId' }
+          if (-not $run) { Write-Host "::error title=No new ANGLE::No successful 'Build new ANGLE for Xbox' run found. Run that workflow first: the app's default screen mode needs libEGL_new.dll / libGLESv2_new.dll."; exit 1 }
+          Write-Host "Using ANGLE from run $run"
+          "run=$run" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
       - name: Get the newer ANGLE built by the "Build new ANGLE" workflow
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.angle_run != '' }}
         uses: actions/download-artifact@v8
         with:
           name: angle-new
           path: angle-new-dl
-          run-id: ${{ inputs.angle_run }}
+          run-id: ${{ steps.angle_pick.outputs.run }}
           github-token: ${{ github.token }}
 
       - name: Put the newer ANGLE next to the app (as libEGL_new.dll / libGLESv2_new.dll)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.angle_run != '' }}
         shell: pwsh
         run: |
           $files = Get-ChildItem angle-new-dl -File -Filter *_new.dll

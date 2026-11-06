@@ -164,7 +164,7 @@ jobs:
         with:
           name: angle-new
           path: angle-new/
-          retention-days: 14
+          retention-days: 90
 
       - name: Post the results as readable notes
         if: always()
