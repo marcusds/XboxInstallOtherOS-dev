@@ -16,9 +16,9 @@ on:
         type: string
         default: ""
       make_release:
-        description: "Also publish the finished package as a public Release (a download page anyone can use without a GitHub account)."
+        description: "Also publish the finished package as a public pre-release (a download page anyone can use without a GitHub account)."
         type: boolean
-        default: false
+        default: true
 
 jobs:
   qemu:
@@ -30,7 +30,7 @@ jobs:
         shell: msys2 {0}
     steps:
       - name: Get the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up the MSYS2 build tools
         uses: msys2/setup-msys2@v2
@@ -51,7 +51,7 @@ jobs:
             mingw-w64-ucrt-x86_64-ccache
 
       - name: Restore the compiled QEMU files from earlier builds
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: .ccache
           key: ccache-qemu-${{ github.run_id }}
@@ -172,7 +172,7 @@ jobs:
 
       - name: Keep the compiled QEMU files for the next build
         if: always()
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: .ccache
           key: ccache-qemu-${{ github.run_id }}
@@ -347,7 +347,7 @@ jobs:
           } >> "$S"
 
       - name: Save the DLL files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: qemudll
           path: qemudll/
@@ -363,18 +363,18 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Get the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Get the QEMU DLL files built by the other job
         continue-on-error: true
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: qemudll
           path: qemudll
 
       - name: Or reuse the QEMU DLL files from an earlier run
         if: ${{ github.event_name == 'workflow_dispatch' && !inputs.with_qemu && inputs.reuse_run != '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: qemudll
           path: qemudll
@@ -409,7 +409,7 @@ jobs:
 
       - name: Get the newer ANGLE built by the "Build new ANGLE" workflow
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.angle_run != '' }}
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: angle-new
           path: angle-new-dl
@@ -426,7 +426,7 @@ jobs:
           Write-Host "::notice title=Newer ANGLE added::$(($files | ForEach-Object { $_.Name + ' ' + $_.Length }) -join ' | ')"
 
       - name: Set up MSBuild
-        uses: microsoft/setup-msbuild@v2
+        uses: microsoft/setup-msbuild@v3
 
       - name: Find the installed Windows SDK
         shell: powershell
@@ -473,7 +473,7 @@ jobs:
           Write-Host "Package contents:"; Get-ChildItem out -Recurse -File | ForEach-Object { Write-Host ("  " + $_.FullName.Substring((Resolve-Path out).Path.Length)) }
 
       - name: Upload the package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: XboxVmHost-package
           retention-days: 14
@@ -493,7 +493,7 @@ jobs:
           Write-Host "Release files:"; $files | ForEach-Object { Write-Host $_ }
           $notes = "Install Other OS $ver. Download the .msix file and the three .appx dependency files (x64) from the list below, then install them with the Xbox Device Portal (Apps manager). See the README for the steps."
           $tag = "v$ver-run$($env:GITHUB_RUN_NUMBER)"
-          $out = & gh release create $tag @files --repo $env:GITHUB_REPOSITORY --title "Install Other OS $ver" --notes $notes 2>&1 | Out-String
+          $out = & gh release create $tag @files --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --prerelease --title "Install Other OS $ver" --notes $notes 2>&1 | Out-String
           Write-Host $out
           if ($LASTEXITCODE -ne 0) {
             $msg = ($out -replace "\r?\n", " | ")
