@@ -2072,53 +2072,22 @@ namespace XboxVmHost
         }
 
         // Windows Hypervisor Platform: what QEMU's -accel whpx would need. Experimental check only.
-        [DllImport("WinHvPlatform.dll", EntryPoint = "WHvGetCapability")]
-        private static extern int WHvGetCapability(int code, IntPtr buffer, uint size, out uint written);
-        [DllImport("WinHvPlatform.dll", EntryPoint = "WHvCreatePartition")]
-        private static extern int WHvCreatePartition(out IntPtr partition);
-        [DllImport("WinHvPlatform.dll", EntryPoint = "WHvSetPartitionProperty")]
-        private static extern int WHvSetPartitionProperty(IntPtr partition, int code, IntPtr buffer, uint size);
-        [DllImport("WinHvPlatform.dll", EntryPoint = "WHvSetupPartition")]
-        private static extern int WHvSetupPartition(IntPtr partition);
-        [DllImport("WinHvPlatform.dll", EntryPoint = "WHvDeletePartition")]
-        private static extern int WHvDeletePartition(IntPtr partition);
+        // The check runs inside qemu.dll (native/uwp_whpx_probe.c): .NET Native refuses P/Invokes into WinHvPlatform.dll.
+        [DllImport("qemu.dll", EntryPoint = "qemu_dll_whpx_probe")]
+        private static extern int qemu_dll_whpx_probe(byte[] output, int length);
 
         private void HypervisorTestButton_Click(object sender, RoutedEventArgs e)
         {
             Log("=== Hardware virtualization test (Windows Hypervisor Platform) ===");
-            IntPtr buf = Marshal.AllocHGlobal(1024);
             try
             {
-                for (int i = 0; i < 1024; i++) Marshal.WriteByte(buf, i, 0);
-                int hr = WHvGetCapability(0 /* HypervisorPresent */, buf, 1024, out uint _);
-                Log("WinHvPlatform.dll loaded. HypervisorPresent: hr=0x" + hr.ToString("X8") + (hr == 0 ? ", value=" + Marshal.ReadInt32(buf) : ""));
-                if (hr != 0 || Marshal.ReadInt32(buf) == 0)
-                {
-                    Log("RESULT: no usable hypervisor for apps (QEMU must keep using software emulation).");
-                    return;
-                }
-                hr = WHvGetCapability(1 /* Features */, buf, 1024, out uint _);
-                Log("Features: hr=0x" + hr.ToString("X8") + (hr == 0 ? ", value=0x" + Marshal.ReadInt64(buf).ToString("X") : ""));
-
-                hr = WHvCreatePartition(out IntPtr part);
-                Log("Create partition: hr=0x" + hr.ToString("X8"));
-                if (hr != 0) { Log("RESULT: hypervisor reports present, but the app may not create a VM."); return; }
-                try
-                {
-                    Marshal.WriteInt32(buf, 1);
-                    hr = WHvSetPartitionProperty(part, 0x1fff /* ProcessorCount */, buf, 4);
-                    Log("Set processor count: hr=0x" + hr.ToString("X8"));
-                    hr = WHvSetupPartition(part);
-                    Log("Set up partition: hr=0x" + hr.ToString("X8"));
-                    Log(hr == 0 ? "RESULT: SUCCESS - the app can create a hardware VM; QEMU -accel whpx is worth trying."
-                                : "RESULT: the VM could not be set up, so hardware virtualization is not usable.");
-                }
-                finally { WHvDeletePartition(part); }
+                var buf = new byte[4096];
+                qemu_dll_whpx_probe(buf, buf.Length);
+                int n = Array.IndexOf(buf, (byte)0);
+                foreach (var line in System.Text.Encoding.ASCII.GetString(buf, 0, n < 0 ? buf.Length : n).Split('\n'))
+                    if (line.Length > 0) Log(line);
             }
-            catch (DllNotFoundException) { Log("RESULT: WinHvPlatform.dll is not available to apps on this console (software emulation only)."); }
-            catch (EntryPointNotFoundException ex) { Log("RESULT: WinHvPlatform.dll is missing a function: " + ex.Message); }
             catch (Exception ex) { Log("RESULT: test failed: " + ex.GetType().Name + ": " + ex.Message); }
-            finally { Marshal.FreeHGlobal(buf); }
         }
     }
 }
